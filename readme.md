@@ -3,6 +3,7 @@ It parses:
 
 - windows:
   - ipconfig
+  - wmic
 - unix:
   - ifconfig
   - ip a
