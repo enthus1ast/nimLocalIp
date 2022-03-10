@@ -1,9 +1,30 @@
 import osproc, strutils
 
 const
+  cmdWmic = "wmic nicconfig get IPAddress"
   cmdIpconfig = "ipconfig"
   cmdIfconfig = "ifconfig"
   cmdIpa= "ip a"
+
+proc wmic*(): seq[string] =
+  ## parses the output of `wmic nicconfig get IPAddress`
+  ## for a crossplatform version use: `getLocalIps`
+  let (outp, code) = execCmdEx(cmdWmic)
+  if code != 0: return
+  for lineRaw in outp.splitLines():
+    var line = lineRaw.strip()
+    if line.isEmptyOrWhitespace: continue
+    if line.startswith("{"):
+      line = line.multiReplace(
+        ("{", ""),
+        ("}", ""),
+        ("\"", ""),
+      )
+      let parts = line.split(",")
+      for part in parts:
+        if part.isEmptyOrWhitespace(): continue
+        if part.contains(":"): continue # skip ipv6
+        result.add part.strip()
 
 proc ipconfig*(): seq[string] =
   ## parses the output of `ipconfig`
@@ -48,14 +69,16 @@ proc ipa*(): seq[string] =
       result.add(line[inet.len .. endpos])
 
 proc getLocalIps*: seq[string] =
-  ## returns the local ip addresses of your adapter
-  ## it parses: `ipconfig` (windows), `ifconfig` and `ip a` on (*ix)
+  ## returns the local ip (v4) addresses of your adapters
+  ## it parses: `ipconfig` and `wmic` (windows), `ifconfig` and `ip a` on (*ix)
   when defined(windows):
-    return ipconfig()
-  else:
-    result = ifconfig()
+    result = ipconfig()
     if result.len == 0:
-      result = ipa()
+      result = wmic()
+  else:
+    result = ipa()
+    if result.len == 0:
+      result = ifconfig()
 
 when isMainModule:
   echo getLocalIps()
